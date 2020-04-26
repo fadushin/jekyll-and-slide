@@ -25,9 +25,9 @@ collections:
 
 # About/contact
 author:
-  name:               Adam Hollett
-  url:                https://twitter.com/admhlt
-  email:              mail@adamhollett.com
+  name:               Fred Dushin
+  url:                http://dushin.net
+  email:              fred@dushin.net
 
 # YAML defaults
 defaults:
@@ -36,3 +36,5 @@ defaults:
       type: slides
     values:
       layout: slides
+
+host: 0.0.0.0
