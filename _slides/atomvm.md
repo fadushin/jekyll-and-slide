@@ -348,6 +348,52 @@ do_something() ->
 
 ## Demo
 
+~~
+
+```sh
+shell$ export ESP_ADDRESS=192.168.211.53
+shell$ curl -s http://${ESP_ADDRESS}:8080/system/info | python -m json.tool
+{
+    "atom_count": 330,
+    "heap_free": 200932,
+    "platform": "esp32",
+    "port_count": 4,
+    "process_count": 8,
+    "word_size": 4
+}
+```
+
+~~
+
+```sh
+shell$ curl -s http://${ESP_ADDRESS}:8080/processes | python -m json.tool
+[
+    "<0.1.0>",
+    "<0.2.0>",
+    "<0.3.0>",
+    "<0.4.0>",
+    "<0.5.0>",
+    "<0.10.0>",
+    "<0.11.0>",
+    "<0.12.0>"
+]
+```
+
+~~
+
+```sh
+shell$ for i in {1..8}; do echo "$(curl -s http://${ESP_ADDRESS}:8080/processes/${i}/info)
+"; done
+{"pid":"<0.1.0>","heap_size":287,"stack_size":4,"message_queue_len":0,"memory":6488}
+{"pid":"<0.2.0>","heap_size":107,"stack_size":6,"message_queue_len":0,"memory":796}
+{"pid":"<0.3.0>","heap_size":37,"stack_size":0,"message_queue_len":0,"memory":440}
+{"pid":"<0.4.0>","heap_size":18,"stack_size":0,"message_queue_len":0,"memory":360}
+{"pid":"<0.5.0>","heap_size":36,"stack_size":0,"message_queue_len":0,"memory":1368}
+{"pid":"<0.22.0>","heap_size":262,"stack_size":11,"message_queue_len":0,"memory":1336}
+{"pid":"<0.25.0>","heap_size":11,"stack_size":0,"message_queue_len":0,"memory":432}
+{"pid":"<0.28.0>","heap_size":18,"stack_size":8,"message_queue_len":0,"memory":420}
+```
+
 ---
 
 ### TODOs
