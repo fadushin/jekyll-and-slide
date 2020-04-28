@@ -2,14 +2,25 @@
 title: AtomVM
 description: A tiny Erlang/Elixir VM for microcontrollers
 author: Fred Dushin
+#year: 2020
 theme: solarized
 ---
 
-## How small?
+## Preface
+
+<span class="fragment">`` `whoami` ``</span>
+
+<span class="fragment">"Typical" AtomVM user</span>
+
+<span class="fragment">Footnotes, caveats, get out of jail free card</span>
+
+---
+
+## How tiny?
 
 ~~
 
-### Pretty small...
+### Pretty tiny...
 
 <img width="350" data-src="../../assets/images/esp32-pico.jpeg" alt="ESP32 Pico"/>
 
@@ -22,17 +33,17 @@ theme: solarized
 ~~
 
 * Xtensa® 32-bit LX6 microprocessor
-    * Dual core + ULP processor
+    * <div class="fragment highlight-blue">Dual core + ULP processor</div>
     * 160Mhz
-    * 520KB RAM
+    * <div class="fragment highlight-red">520KB RAM</div>
     * 4MB Flash (typical)
-* Built-in 802.11 b/g/n wifi
+* <div class="fragment highlight-blue">Built-in 802.11 b/g/n wifi</div>
 * Bluetooth 4.2
 * 34 GPIO pins
 * Power
     * 3.3v
     * 20-25 (mA)
-    * 5uA (deep sleep)
+    * <div class="fragment highlight-blue">5uA (deep sleep)</div>
 
 ~~
 
@@ -64,29 +75,36 @@ theme: solarized
 
 ~~
 
-* FreeRTOS
-    * Real-time OS
-    * Tasks
-    * Queues
-    * Interrupts
+### FreeRTOS
+
+* Real-time OS
+* Tasks
+* Queues
+* Interrupts
 
 ~~
 
-* Espressif IDF SDK
-    * SMP support for RTOS
-    * Serial (UART) communication
-    * I/O interfaces
-        * GPIO, LEDC, I2C, I2S, etc
+###  Espressif IDF SDK
+
+* SMP support for RTOS
+* I/O interfaces
+    * UART, GPIO, LEDC, I2C, I2S, etc
+* Networking
     * WIFI (STA, AP, or STA+AP)
     * Bluetooth
     * UDP, TCP/IP (lwip)
+* Storage
+    * mmap
+    * non-volatile storage
+    * file systems (vFAT)
 
 ~~
 
-* Tooling
-    * Xtensa C cross-compiler/linker
-    * GNU `make` or `cmake`
-    * `esptool.py` (flashing over USB/serial)
+### Tooling
+
+* Xtensa C cross-compiler/linker
+* GNU `make` or `cmake`
+* `esptool.py` (flashing over USB/serial)
 
 ~~
 
@@ -142,6 +160,7 @@ theme: solarized
 * Bignums
 * Maps
 * Links (monitors, supervisors, etc)
+* stacktrace
 * Reference counted binaries
 * SMP support
 * Hot swapping
@@ -152,7 +171,7 @@ theme: solarized
 ### Libraries
 
 * estdlib
-    * `timer`, `lists`, `proplists`
+    * `erlang`, `timer`, `lists`, `proplists`
     * `gen_server`, `gen_statem`
     * `gen_tcp`, `gen_udp`, `inet`
     * `io`, `io_lib`
@@ -183,8 +202,10 @@ theme: solarized
 ### PackBEAM
 
 ```sh
+shell$ erlc foo.erl
+shell$ erlc bar.erl
 shell$ PackBEAM \
-    -a hello.avm hello.beam \
+    -a foo.avm foo.beam bar.beam \
     .../eavmlib.avm \
     .../estdlib.avm
 ```
@@ -201,7 +222,7 @@ shell$ esptool.py \
     --port /dev/ttyusb0 \
     write_flash \
     0x110000 \
-    hello.avm
+    foo.avm
 ```
 
 Flash the AVM file to the start of the `main.app` partition (address 0x110000)
@@ -209,6 +230,8 @@ Flash the AVM file to the start of the `main.app` partition (address 0x110000)
 ~~
 
 ### ESP Main partition
+
+AVM file written to `main.app` partition; contains beam files in sequence.
 
 <img width="600" data-src="../../assets/images/esp32-beams.png" alt="ESP32 Main Partition"  />
 
@@ -227,12 +250,15 @@ Flash the AVM file to the start of the `main.app` partition (address 0x110000)
 ### Obligatory Hello World!
 
 ```erlang
--module(ok).
+-module(hello).
+
+-export([start/0]).
+
 start() ->
-    io:format("hello World!~n").
+    io:format("Hello World!~n").
 ```
 
-AVM modules have a `start` entrypoint.
+All AVM programs have a `start` entrypoint.
 
 ~~
 
@@ -254,6 +280,33 @@ loop(GPIO, Val) ->
 ```
 
 The "Hello World" of IoT!
+
+~~
+
+### Procs
+
+```erlang
+-module(pingpong).
+-export([start/0]).
+
+start() ->
+    Pong = spawn(fun() -> pong() end),
+    ping(Pong).
+
+ping(Pong) ->
+    Pong ! {ping, self()},
+    receive
+        pong -> ping(Pong)
+    end.
+
+pong() ->
+    receive
+        {ping, Pid} ->
+	    timer:sleep(1000),
+	    Pid ! pong
+	    pong()
+    end.
+```
 
 ~~
 
@@ -325,11 +378,7 @@ take_measurement(DHT) ->
 -export([start/0]).
 
 start() ->
-    Creds = [
-        {ssid, esp:nvs_get_binary(atomvm, sta_ssid, <<"myssid">>)},
-        {psk,  esp:nvs_get_binary(atomvm, sta_psk, <<"mypsk">>)}
-    ],
-    case network_fsm:wait_for_sta(Creds, 30000) of
+    case network_fsm:wait_for_sta(30000) of
         {ok, {Address, Netmask, Gateway}} ->
             io:format(
                 "IP address: ~p Netmask: ~p Gateway: ~p~n",
@@ -398,14 +447,14 @@ shell$ for i in {1..8}; do echo "$(curl -s http://${ESP_ADDRESS}:8080/processes/
 
 ### TODOs
 
-1. Stability/release
-1. Tooling
-1. Maps
-1. Peripherals, peripherals, peripherals
+1. stability/release/tooling
+1. maps
+1. peripherals, peripherals, peripherals
 1. AP, STA+AP modes
-1. Links
-1. Disterl
+1. links
+1. disterl
 1. SMP
+1. deep sleep
 
 ---
 

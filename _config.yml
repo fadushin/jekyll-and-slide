@@ -12,8 +12,8 @@ reveal:
 title:                Jekyll and Slide
 tagline:              "Markdown slides in Jekyll using reveal.js"
 description:          "A template for creating slide decks using Markdown and <a href='//jekyllrb.com'>Jekyll</a>, using <a href='//github.com/poole/lanyon'>Lanyon</a> by <a href='//twitter.com/mdo'>@mdo</a>."
-url:                  http://admhlt.github.io/jekyll-and-slide
-baseurl:              /jekyll-and-slide
+url:                  http://dushin.net
+baseurl:              /talks
 markdown:             kramdown
 kramdown:
   input:              GFM
@@ -25,7 +25,7 @@ collections:
 
 # About/contact
 author:
-  name:               Fred Dushin
+  name:               dushin.net
   url:                http://dushin.net
   email:              fred@dushin.net
 
