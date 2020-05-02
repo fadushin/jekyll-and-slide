@@ -241,6 +241,12 @@ AVM file written to `main.app` partition; contains beam files in sequence.
 
 <img width="600" data-src="../../assets/images/esp32-modules.png" alt="ESP32 Modules"  />
 
+~~
+
+### Process Memory
+
+<img width="600" data-src="../../assets/images/esp32-memory.png" alt="ESP32 Memory"  />
+
 ---
 
 ## AtomVM Programs
@@ -251,7 +257,6 @@ AVM file written to `main.app` partition; contains beam files in sequence.
 
 ```erlang
 -module(hello).
-
 -export([start/0]).
 
 start() ->
@@ -259,27 +264,6 @@ start() ->
 ```
 
 All AVM programs have a `start` entrypoint.
-
-~~
-
-### Blinky
-
-```erlang
--module (blinky).
--export([start/0]).
-
-start() ->
-    GPIO = gpio:open(),
-    gpio:set_direction(GPIO, 2, output),
-    loop(GPIO, 1).
-
-loop(GPIO, Val) ->
-    gpio:set_level(GPIO, 2, Val),
-    timer:sleep(1000),
-    loop(GPIO, 1 - Val).
-```
-
-The "Hello World" of IoT!
 
 ~~
 
@@ -296,53 +280,49 @@ start() ->
 ping(Pong) ->
     Pong ! {ping, self()},
     receive
-        pong -> ping(Pong)
+        pong ->
+            erlang:display(pong),
+            ping(Pong)
     end.
 
 pong() ->
     receive
         {ping, Pid} ->
-	    timer:sleep(1000),
-	    Pid ! pong
-	    pong()
+            erlang:display(ping),
+	        timer:sleep(1000),
+	        Pid ! pong,
+	        pong()
     end.
 ```
 
 ~~
 
-### Non-volatile Storage
+### Blinky
 
 ```erlang
--module(esp_nvs).
+-module (blinky).
 -export([start/0]).
 
--record(state, {count = 0}).
-
 start() ->
-    Bin = esp:nvs_get_binary(?MODULE, starts),
-    NewState = case Bin of
-        undefined ->
-            #state{};
-        _ ->
-            case erlang:binary_to_term(Bin) of
-                #state{count = Count} = OldState ->
-                    OldState#state{count = Count + 1};
-                _ ->
-                    erlang:display({error, bad_value}),
-                    #state{}
-            end
-    end,
-    io:format("This device has rebooted ~p times.~n", [NewState#state.count]),
-    io:format("Reset device to increment.~n"),
-    esp:nvs_set_binary(?MODULE, starts, erlang:term_to_binary(NewState)).
+    GPIO = gpio:open(),
+    gpio:set_direction(GPIO, 2, output),
+    loop(GPIO, 1).
+
+loop(GPIO, Val) ->
+    gpio:set_level(GPIO, 2, Val),
+    io:format("Set pin 2 to ~p~n", [Val]),
+    timer:sleep(1000),
+    loop(GPIO, 1 - Val).
 ```
+
+The "Hello World" of IoT!
 
 ~~
 
-### DHT Example
+### DHT
 
 ```erlang
--module (dht_example).
+-module (dht_demo).
 
 -export([start/0]).
 
@@ -352,7 +332,7 @@ start() ->
 
 loop(DHT11) ->
     take_measurement(DHT11),
-    timer:sleep(30000),
+    timer:sleep(10000),
     loop(DHT11).
 
 take_measurement(DHT) ->
@@ -364,33 +344,121 @@ take_measurement(DHT) ->
                     Temp, TempFractional, Hum, HumFractional]
             );
         Error ->
-            io:format("Error taking measurement on ~p: ~p~n", [Device, Error])
+            io:format("Error taking measurement: ~p~n", [Error])
     end.
 ```
 
 ~~
 
-### Network FSM
+### WIFI (STA mode)
 
 ```erlang
--module(wait_for_wifi).
-
+-module(wifi_demo).
 -export([start/0]).
 
+-include("logger.hrl").
+
 start() ->
-    case network_fsm:wait_for_sta(30000) of
+    case atomvm:platform() of
+        esp32 ->
+            start_wifi();
+        _ -> ok
+    end,
+    run().
+
+start_wifi() ->
+    case network_fsm:wait_for_sta() of
         {ok, {Address, Netmask, Gateway}} ->
-            io:format(
-                "IP address: ~p Netmask: ~p Gateway: ~p~n",
+            ?LOG_INFO(
+                "IP address: ~p Netmask: ~p Gateway: ~p",
                 [Address, Netmask, Gateway]
-            ),
-            do_something();
+            );
         Error ->
-            io:format("An error occurred starting network: ~p~n", [Error])
+            ?LOG_ERROR("An error occurred starting network: ~p", [Error])
     end.
 
-do_something() ->
-    ...
+run() ->
+    avm_util:sleep_forever().
+```
+
+~~
+
+### HTTPd Demo
+
+```erlang
+-module(httpd_demo).
+-export([start/0, handle_api_request/4]).
+
+-include("logger.hrl").
+
+start() ->
+    case atomvm:platform() of
+        esp32 ->
+            start_wifi();
+        _ -> ok
+    end,
+    run().
+
+start_wifi() ->
+    case network_fsm:wait_for_sta() of
+        {ok, {Address, Netmask, Gateway}} ->
+            ?LOG_INFO(
+                "IP address: ~p Netmask: ~p Gateway: ~p",
+                [Address, Netmask, Gateway]
+            );
+        Error ->
+            ?LOG_ERROR("An error occurred starting network: ~p", [Error])
+    end.
+
+-record(opts, {dht, gpio, pin}).
+
+run() ->
+    GPIO = gpio:open(),
+    gpio:set_direction(GPIO, 2, output),
+    {ok, DHT11} = dht:start(21, dht11),
+    Opts = #opts{dht=DHT11, gpio=GPIO, pin=2},
+    Config = [{["api"], api_handler, {?MODULE, Opts}}],
+    ?LOG_INFO("Starting httpd on port 8080", []),
+    case httpd:start(8080, Config) of
+        {ok, _Pid} ->
+            ?LOG_INFO("httpd started.", []),
+            avm_util:sleep_forever();
+        Error ->
+            ?LOG_ERROR("An error occurred: ~p", [Error])
+    end.
+
+%%
+%% API Handler implementation
+%%
+
+handle_api_request(get, ["temp"], HttpRequest, #opts{dht=DHT11}) ->
+    Socket = proplists:get_value(socket, proplists:get_value(tcp, HttpRequest)),
+    {ok, {Host, _Port}} = inet:peername(Socket),
+    ?LOG_INFO("Temperature request from ~p", [Host]),
+    {ok, {Temp, TempFractional, Hum, HumFractional}} = dht:measure(DHT11),
+    {ok, [
+        {temp, Temp},
+        {temp_fractional, TempFractional},
+        {hum, Hum},
+        {hum_fractional, HumFractional}
+    ]};
+handle_api_request(post, ["led"], HttpRequest, #opts{gpio=GPIO, pin=Pin}) ->
+    Socket = proplists:get_value(socket, proplists:get_value(tcp, HttpRequest)),
+    {ok, {Host, _Port}} = inet:peername(Socket),
+    QueryParams = proplists:get_value(query_params, HttpRequest),
+    case proplists:get_value("led", QueryParams) of
+        "on" ->
+            ?LOG_INFO("Turning on LED from ~p", [Host]),
+            {ok, gpio:set_level(GPIO, Pin, 1)};
+        "off" ->
+            ?LOG_INFO("Turning off LED from ~p", [Host]),
+            {ok, gpio:set_level(GPIO, Pin, 0)};
+        _ ->
+            bad_request
+    end;
+handle_api_request(Method, Path, _HttpRequest, _HandlerOpts) ->
+    ?LOG_ERROR("Unsupported method ~p and path ~p", [Method, Path]),
+    not_found.
 ```
 
 ---
@@ -399,48 +467,90 @@ do_something() ->
 
 ~~
 
+Laptop
 ```sh
-shell$ export ESP_ADDRESS=192.168.211.53
-shell$ curl -s http://${ESP_ADDRESS}:8080/system/info | python -m json.tool
-{
-    "atom_count": 330,
-    "heap_free": 200932,
-    "platform": "esp32",
-    "port_count": 4,
-    "process_count": 8,
-    "word_size": 4
-}
+shell$ curl -i -X GET "http://atomvm:8080/api/temp"
+curl -i -X GET "http://atomvm:8080/api/temp"
+HTTP/1.1 200 OK
+Server: atomvm-httpd
+Content-Type: "application/json"
+
+{"temp":22,"temp_fractional":9,"hum":43,"hum_fractional":0}
+```
+
+ESP32 Console
+```sh
+1970-1-1T0:0:29.000 [httpd_demo:handle_api_request/4:56] <0.13.0> error: Unsupported method get and path ""
+1970-1-1T0:0:29.000 [httpd:handle_error/3:174] <0.13.0> error: error in httpd. StatusCode=404  Error=not_found
 ```
 
 ~~
 
+Laptop
 ```sh
-shell$ curl -s http://${ESP_ADDRESS}:8080/processes | python -m json.tool
-[
-    "<0.1.0>",
-    "<0.2.0>",
-    "<0.3.0>",
-    "<0.4.0>",
-    "<0.5.0>",
-    "<0.10.0>",
-    "<0.11.0>",
-    "<0.12.0>"
-]
+shell$ curl -i -X POST "http://atomvm:8080/api/led?led=on"
+HTTP/1.1 200 OK
+Server: atomvm-httpd
+Content-Type: "application/json"
+
+"ok"
+```
+
+ESP32 Console
+```sh
+1970-1-1T0:0:8.000 [httpd_demo:handle_api_request/4:47] <0.7.0> info: Turning on LED from { {192,168,211,13},52262}
 ```
 
 ~~
 
+Laptop
 ```sh
-shell$ for i in {1..8}; do echo "$(curl -s http://${ESP_ADDRESS}:8080/processes/${i}/info)
-"; done
-{"pid":"<0.1.0>","heap_size":287,"stack_size":4,"message_queue_len":0,"memory":6488}
-{"pid":"<0.2.0>","heap_size":107,"stack_size":6,"message_queue_len":0,"memory":796}
-{"pid":"<0.3.0>","heap_size":37,"stack_size":0,"message_queue_len":0,"memory":440}
-{"pid":"<0.4.0>","heap_size":18,"stack_size":0,"message_queue_len":0,"memory":360}
-{"pid":"<0.5.0>","heap_size":36,"stack_size":0,"message_queue_len":0,"memory":1368}
-{"pid":"<0.22.0>","heap_size":262,"stack_size":11,"message_queue_len":0,"memory":1336}
-{"pid":"<0.25.0>","heap_size":11,"stack_size":0,"message_queue_len":0,"memory":432}
-{"pid":"<0.28.0>","heap_size":18,"stack_size":8,"message_queue_len":0,"memory":420}
+shell$ curl -i -X POST "http://atomvm:8080/api/led?led=off"
+HTTP/1.1 200 OK
+Server: atomvm-httpd
+Content-Type: "application/json"
+
+"ok"
+```
+
+ESP32 Console
+```sh
+1970-1-1T0:0:13.000 [httpd_demo:handle_api_request/4:50] <0.9.0> info: Turning off LED from { {192,168,211,13},52263}
+```
+
+~~
+
+Laptop
+```sh
+shell$ curl -i -X POST "http://atomvm:8080/api/led?foo=bar"
+HTTP/1.1 400 BAD_REQUEST
+Server: atomvm-httpd
+Content-Type: "text/html"
+
+Error: bad_request
+```
+
+ESP32 Console
+```sh
+1970-1-1T0:0:20.000 [httpd:handle_error/3:174] <0.11.0> error: error in httpd. StatusCode=400  Error=bad_request
+```
+
+~~
+
+Laptop
+```sh
+shell$ curl -i -X GET "http://atomvm:8080/api/led"
+HTTP/1.1 404 NOT_FOUND
+Server: atomvm-httpd
+Content-Type: "text/html"
+
+Error: not_found
+```
+
+ESP32 Console
+```sh
+1970-1-1T0:0:29.000 [httpd_demo:handle_api_request/4:56] <0.13.0> error: Unsupported method get and path ""
+1970-1-1T0:0:29.000 [httpd:handle_error/3:174] <0.13.0> error: error in httpd. StatusCode=404  Error=not_found
 ```
 
 ---
