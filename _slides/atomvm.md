@@ -359,6 +359,7 @@ take_measurement(DHT) ->
 -include("logger.hrl").
 
 start() ->
+    erlang:display({esp32_free_heap_size, erlang:system_info(esp32_free_heap_size)}),
     case atomvm:platform() of
         esp32 ->
             start_wifi();
@@ -370,15 +371,20 @@ start_wifi() ->
     case network_fsm:wait_for_sta() of
         {ok, {Address, Netmask, Gateway}} ->
             ?LOG_INFO(
-                "IP address: ~p Netmask: ~p Gateway: ~p",
-                [Address, Netmask, Gateway]
+                "IP address: ~s Netmask: ~s Gateway: ~s", [
+                    avm_util:address_to_string(Address),
+                    avm_util:address_to_string(Netmask),
+                    avm_util:address_to_string(Gateway)
+                ]
             );
         Error ->
             ?LOG_ERROR("An error occurred starting network: ~p", [Error])
     end.
 
 run() ->
+    erlang:display({esp32_free_heap_size, erlang:system_info(esp32_free_heap_size)}),
     avm_util:sleep_forever().
+
 ```
 
 ~~
@@ -400,11 +406,14 @@ start() ->
     run().
 
 start_wifi() ->
-    case network_fsm:wait_for_sta() of
+    case network_fsm:wait_for_sta([{sntp, "pool.ntp.org"}]) of
         {ok, {Address, Netmask, Gateway}} ->
             ?LOG_INFO(
-                "IP address: ~p Netmask: ~p Gateway: ~p",
-                [Address, Netmask, Gateway]
+                "IP address: ~s Netmask: ~s Gateway: ~s", [
+                    avm_util:address_to_string(Address),
+                    avm_util:address_to_string(Netmask),
+                    avm_util:address_to_string(Gateway)
+                ]
             );
         Error ->
             ?LOG_ERROR("An error occurred starting network: ~p", [Error])
@@ -434,7 +443,7 @@ run() ->
 handle_api_request(get, ["temp"], HttpRequest, #opts{dht=DHT11}) ->
     Socket = proplists:get_value(socket, proplists:get_value(tcp, HttpRequest)),
     {ok, {Host, _Port}} = inet:peername(Socket),
-    ?LOG_INFO("Temperature request from ~p", [Host]),
+    ?LOG_INFO("Temperature request from ~s", [avm_util:address_to_string(Host)]),
     {ok, {Temp, TempFractional, Hum, HumFractional}} = dht:measure(DHT11),
     {ok, [
         {temp, Temp},
@@ -448,10 +457,10 @@ handle_api_request(post, ["led"], HttpRequest, #opts{gpio=GPIO, pin=Pin}) ->
     QueryParams = proplists:get_value(query_params, HttpRequest),
     case proplists:get_value("led", QueryParams) of
         "on" ->
-            ?LOG_INFO("Turning on LED from ~p", [Host]),
+            ?LOG_INFO("Turning on LED from ~s", [avm_util:address_to_string(Host)]),
             {ok, gpio:set_level(GPIO, Pin, 1)};
         "off" ->
-            ?LOG_INFO("Turning off LED from ~p", [Host]),
+            ?LOG_INFO("Turning off LED from ~s", [avm_util:address_to_string(Host)]),
             {ok, gpio:set_level(GPIO, Pin, 0)};
         _ ->
             bad_request
