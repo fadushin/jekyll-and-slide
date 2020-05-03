@@ -289,9 +289,9 @@ pong() ->
     receive
         {ping, Pid} ->
             erlang:display(ping),
-	        timer:sleep(1000),
-	        Pid ! pong,
-	        pong()
+            timer:sleep(1000),
+            Pid ! pong,
+            pong()
     end.
 ```
 
@@ -359,7 +359,6 @@ take_measurement(DHT) ->
 -include("logger.hrl").
 
 start() ->
-    erlang:display({esp32_free_heap_size, erlang:system_info(esp32_free_heap_size)}),
     case atomvm:platform() of
         esp32 ->
             start_wifi();
@@ -382,7 +381,6 @@ start_wifi() ->
     end.
 
 run() ->
-    erlang:display({esp32_free_heap_size, erlang:system_info(esp32_free_heap_size)}),
     avm_util:sleep_forever().
 
 ```
