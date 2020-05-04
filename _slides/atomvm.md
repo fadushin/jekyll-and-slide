@@ -477,7 +477,6 @@ handle_api_request(Method, Path, _HttpRequest, _HandlerOpts) ->
 Laptop
 ```sh
 shell$ curl -i -X GET "http://atomvm:8080/api/temp"
-curl -i -X GET "http://atomvm:8080/api/temp"
 HTTP/1.1 200 OK
 Server: atomvm-httpd
 Content-Type: "application/json"
@@ -487,8 +486,7 @@ Content-Type: "application/json"
 
 ESP32 Console
 ```sh
-1970-1-1T0:0:29.000 [httpd_demo:handle_api_request/4:56] <0.13.0> error: Unsupported method get and path ""
-1970-1-1T0:0:29.000 [httpd:handle_error/3:174] <0.13.0> error: error in httpd. StatusCode=404  Error=not_found
+2020-05-03T23:24:21.000 [httpd_demo:handle_api_request/4:52] <0.8.0> info: Temperature request from 192.168.211.13
 ```
 
 ~~
@@ -505,7 +503,7 @@ Content-Type: "application/json"
 
 ESP32 Console
 ```sh
-1970-1-1T0:0:8.000 [httpd_demo:handle_api_request/4:47] <0.7.0> info: Turning on LED from { {192,168,211,13},52262}
+2020-05-03T23:26:42.000 [httpd_demo:handle_api_request/4:66] <0.10.0> info: Turning on LED from 192.168.211.13
 ```
 
 ~~
@@ -522,7 +520,7 @@ Content-Type: "application/json"
 
 ESP32 Console
 ```sh
-1970-1-1T0:0:13.000 [httpd_demo:handle_api_request/4:50] <0.9.0> info: Turning off LED from { {192,168,211,13},52263}
+2020-05-03T23:27:26.000 [httpd_demo:handle_api_request/4:69] <0.12.0> info: Turning off LED from 192.168.211.13
 ```
 
 ~~
@@ -539,7 +537,7 @@ Error: bad_request
 
 ESP32 Console
 ```sh
-1970-1-1T0:0:20.000 [httpd:handle_error/3:174] <0.11.0> error: error in httpd. StatusCode=400  Error=bad_request
+2020-05-03T23:27:57.000 [httpd:handle_error/3:174] <0.14.0> error: error in httpd. StatusCode=400  Error=bad_request
 ```
 
 ~~
@@ -556,8 +554,8 @@ Error: not_found
 
 ESP32 Console
 ```sh
-1970-1-1T0:0:29.000 [httpd_demo:handle_api_request/4:56] <0.13.0> error: Unsupported method get and path ""
-1970-1-1T0:0:29.000 [httpd:handle_error/3:174] <0.13.0> error: error in httpd. StatusCode=404  Error=not_found
+2020-05-03T23:28:29.000 [httpd_demo:handle_api_request/4:75] <0.16.0> error: Unsupported method get and path ["led"]
+2020-05-03T23:28:29.000 [httpd:handle_error/3:174] <0.16.0> error: error in httpd. StatusCode=404  Error=not_found
 ```
 
 ---
